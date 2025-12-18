@@ -5,14 +5,14 @@ import google.generativeai as genai
 from supabase import create_client, Client
 from pydantic import BaseModel, Field
 from typing import Optional
-from flask import Flask, request
+from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
 
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -85,12 +85,12 @@ def sms_webhook():
     incoming_message = request.form.get('Body', '').strip()
     from_number = request.form.get('From', '')
     
-    print(f"📩 Received SMS from {from_number}: '{incoming_message}'")
+    print(f"Received SMS from {from_number}: '{incoming_message}'")
     
     if not incoming_message:
         resp = MessagingResponse()
         resp.message("I didn't receive any message. Please try again!")
-        return str(resp), 200
+        return Response(str(resp), mimetype='text/xml'), 200
     
     task_object = parse_text_to_task(incoming_message)
     
@@ -108,15 +108,15 @@ def sms_webhook():
                 + f"\n🏷️ Category: {task_object.category}\n"
                 f"⚡ Priority: {task_object.priority}"
             )
-            return str(resp), 200
+            return Response(str(resp), mimetype='text/xml'), 200
         else:
             resp = MessagingResponse()
-            resp.message("❌ Failed to save task to database. Please try again.")
-            return str(resp), 200
+            resp.message("Failed to save task to database. Please try again.")
+            return Response(str(resp), mimetype='text/xml'), 200
     else:
         resp = MessagingResponse()
-        resp.message("❌ I couldn't understand that task. Please try rephrasing it!")
-        return str(resp), 200
+        resp.message("I couldn't understand that task. Please try rephrasing it!")
+        return Response(str(resp), mimetype='text/xml'), 200
 
 
 @app.route('/health', methods=['GET'])
@@ -127,4 +127,4 @@ def health_check():
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='localhost', port=port, debug=True)

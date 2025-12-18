@@ -8,11 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
-<<<<<<< HEAD
-
 # Environment variables
+.env.local
 .env
 
 passwords.txt
-=======
->>>>>>> 67c6b6d174531917e1e54c39b708ac52e3a98408
+

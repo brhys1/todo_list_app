@@ -11,4 +11,5 @@ dependencies = [
     "flask>=3.0.0",
     "twilio>=9.0.0",
     "requests>=2.32.5",
+    "dotenv>=0.9.9",
 ]
