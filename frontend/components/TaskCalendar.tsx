@@ -16,6 +16,7 @@ interface Task {
   user_id: string
 }
 
+
 type Value = Date | null
 
 export default function TaskCalendar() {
@@ -80,7 +81,7 @@ export default function TaskCalendar() {
           console.log('Successfully subscribed to task changes')
         }
       })
-      
+
     return () => {
       supabase.removeChannel(channel)
     }

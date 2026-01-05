@@ -154,8 +154,6 @@ def health_check():
     """Health check endpoint"""
     return {"status": "ok"}, 200
 
-
-
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8080))
     # Cloud Run requires binding to 0.0.0.0, not localhost
