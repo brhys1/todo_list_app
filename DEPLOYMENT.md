@@ -127,15 +127,33 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 ## Step 6: Configure OAuth Redirect URLs
 
-1. **Update Supabase OAuth Redirect URLs**
-   - Go to Supabase Dashboard → Authentication → URL Configuration
-   - Add your Cloud Run frontend URL: `https://todo-list-frontend-XXXXX-uc.a.run.app/auth/callback`
-   - Also add: `https://YOUR_DOMAIN/auth/callback` if using a custom domain
+**IMPORTANT**: You must complete this step after deploying your frontend, as you need the actual Cloud Run URL.
 
-2. **Update Google OAuth (if using Google Sign-In)**
+1. **Get your Cloud Run Frontend URL**
+   ```bash
+   gcloud run services describe todo-list-frontend \
+     --region us-central1 \
+     --format 'value(status.url)'
+   ```
+   This will return something like: `https://todo-list-frontend-xxxxx-uc.a.run.app`
+
+2. **Update Supabase OAuth Redirect URLs**
+   - Go to [Supabase Dashboard](https://app.supabase.com) → Your Project → Authentication → URL Configuration
+   - In the "Redirect URLs" section, add:
+     - `https://YOUR_FRONTEND_URL/auth/callback` (replace with your actual Cloud Run URL)
+     - Example: `https://todo-list-frontend-xxxxx-uc.a.run.app/auth/callback`
+   - **Remove** any incorrect URLs like `http://0.0.0.0:8080` or `https://0.0.0.0:8080`
+   - Click "Save"
+
+3. **Update Google OAuth Redirect URLs**
    - Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
-   - Edit your OAuth 2.0 Client ID
-   - Add authorized redirect URI: `https://YOUR_FRONTEND_URL/auth/callback`
+   - Find and edit your OAuth 2.0 Client ID (the one used by Supabase)
+   - Under "Authorized redirect URIs", add:
+     - `https://YOUR_FRONTEND_URL/auth/callback`
+     - Example: `https://todo-list-frontend-xxxxx-uc.a.run.app/auth/callback`
+   - **IMPORTANT**: Also ensure Supabase's callback URL is there:
+     - `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`
+   - Click "Save"
 
 ## Step 7: Deploy
 
