@@ -192,6 +192,18 @@ export default function TaskCalendar() {
           </button>
         </div>
       </div>
+
+      {/* SMS Phone Number Info */}
+      <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">📱</span>
+          <div>
+            <p className="text-sm text-gray-300 mb-1">Text your tasks to:</p>
+            <p className="text-lg font-semibold text-white">(484) 939-6264</p>
+            <p className="text-xs text-gray-400 mt-1">Send messages like "Buy milk tomorrow" or "Meeting at 3pm Friday"</p>
+          </div>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Calendar Section - Now takes up 2 columns on large screens */}

@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 import datetime
+from datetime import timezone
+from zoneinfo import ZoneInfo
 import google.generativeai as genai
 from supabase import create_client, Client
 from pydantic import BaseModel, Field
@@ -26,9 +28,29 @@ class TaskSchema(BaseModel):
     priority: str = Field(description="Priority level: 'High', 'Medium', or 'Low'.")
     category: str = Field(description="A single word tag like 'Work', 'Personal', 'Health'.")
 
-def parse_text_to_task(user_text: str):
+def get_user_timezone(user_id: str) -> str:
+    """Get user's timezone from profile, default to America/New_York (Eastern Time)"""
+    try:
+        response = supabase.table("profiles").select("timezone").eq("id", user_id).execute()
+        if response.data and len(response.data) > 0 and response.data[0].get("timezone"):
+            return response.data[0]["timezone"]
+    except Exception as e:
+        print(f"Error fetching user timezone: {e}")
+    # Default to Eastern Time (America/New_York)
+    return "America/New_York"
+
+def parse_text_to_task(user_text: str, user_id: str):
+    # Get user's timezone (defaults to America/New_York)
+    user_tz = get_user_timezone(user_id)
     
-    today = datetime.date.today()
+    # Get today's date in the user's timezone
+    try:
+        tz = ZoneInfo(user_tz)
+    except Exception as e:
+        print(f"Invalid timezone {user_tz}, defaulting to America/New_York: {e}")
+        tz = ZoneInfo("America/New_York")
+    
+    today = datetime.datetime.now(tz).date()
     day_name = today.strftime("%A") 
     full_date = today.strftime("%Y-%m-%d")
 
@@ -114,15 +136,19 @@ def sms_webhook():
         resp.message("I didn't receive any message. Please try again!")
         return Response(str(resp), mimetype='text/xml'), 200
     
-    task_object = parse_text_to_task(incoming_message)
+    # Look up user by phone number first (needed for timezone)
+    user_id = get_user_by_phone_number(from_number)
+    
+    if not user_id:
+        resp = MessagingResponse()
+        resp.message("❌ No account found for this phone number. Please sign up at the web app first and add your phone number.")
+        return Response(str(resp), mimetype='text/xml'), 200
+    
+    # Parse task with user's timezone
+    task_object = parse_text_to_task(incoming_message, user_id)
     
     if task_object:
         print(f"🤖 AI Parsed: {task_object.task_name}")
-        
-        # Look up user by phone number
-        user_id = get_user_by_phone_number(from_number)
-        
-        if not user_id:
             resp = MessagingResponse()
             resp.message("❌ No account found for this phone number. Please sign up at the web app first and add your phone number.")
             return Response(str(resp), mimetype='text/xml'), 200

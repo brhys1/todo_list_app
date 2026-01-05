@@ -38,10 +38,30 @@ const COUNTRY_CODES = [
   { code: '+84', country: 'Vietnam' },
 ]
 
+// Common timezones
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' },
+  { value: 'America/Toronto', label: 'Eastern Time - Toronto' },
+  { value: 'America/Vancouver', label: 'Pacific Time - Vancouver' },
+  { value: 'Europe/London', label: 'London (GMT)' },
+  { value: 'Europe/Paris', label: 'Paris (CET)' },
+  { value: 'Europe/Berlin', label: 'Berlin (CET)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo (BRT)' },
+]
+
 export default function PhoneNumberSetup() {
   const { user } = useAuth()
   const [countryCode, setCountryCode] = useState('+1')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [timezone, setTimezone] = useState('America/New_York') // Default to Eastern Time
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
@@ -60,7 +80,7 @@ export default function PhoneNumberSetup() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('phone_number')
+          .select('phone_number, timezone')
           .eq('id', user.id)
           .single()
 
@@ -82,6 +102,10 @@ export default function PhoneNumberSetup() {
               setCountryCode('+1')
               setPhoneNumber(existingPhone.substring(1))
             }
+          }
+          // Set timezone if it exists, otherwise keep default
+          if (data.timezone) {
+            setTimezone(data.timezone)
           }
         }
       } catch (err) {
@@ -123,6 +147,7 @@ export default function PhoneNumberSetup() {
           {
             id: user.id,
             phone_number: formattedPhone,
+            timezone: timezone,
             updated_at: new Date().toISOString(),
           },
           {
@@ -138,9 +163,7 @@ export default function PhoneNumberSetup() {
       }
 
       setHasPhoneNumber(true)
-      setTimeout(() => {
-        window.location.reload()
-      }, 100)
+      // Don't reload - let the success message display
     } catch (err) {
       console.error('Error:', err)
       setError('An unexpected error occurred. Please try again.')
@@ -157,7 +180,32 @@ export default function PhoneNumberSetup() {
   }
 
   if (hasPhoneNumber) {
-    return null
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="bg-gray-900 rounded-xl shadow-2xl p-8 border border-gray-800 max-w-md w-full">
+          <div className="text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold mb-2 text-white">
+              Phone Number Saved!
+            </h1>
+            <p className="text-gray-400 mb-6">
+              Your phone number has been added to your profile.
+            </p>
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <p className="text-sm text-gray-400 mb-2">Text your tasks to:</p>
+              <p className="text-xl font-semibold text-white">(484) 939-6264</p>
+              <p className="text-xs text-gray-500 mt-2">
+                Send a message like "Buy milk tomorrow" or "Meeting at 3pm Friday"
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -218,6 +266,29 @@ export default function PhoneNumberSetup() {
             </div>
             <p className="mt-2 text-xs text-gray-500">
               Select your country code and enter your phone number
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="timezone" className="block text-sm font-medium text-gray-300 mb-2">
+              Timezone
+            </label>
+            <select
+              id="timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
+              disabled={loading}
+              required
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value} className="bg-gray-800">
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-gray-500">
+              Your timezone is used to calculate dates for tasks (default: Eastern Time)
             </p>
           </div>
 
