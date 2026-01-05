@@ -14,3 +14,6 @@ wheels/
 
 passwords.txt
 
+#.json secrets
+client_secret_338641326538-p1itk99d0b6m71k5i474kjbvqio7clrg.apps.googleusercontent.com.json
+key.json

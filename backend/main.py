@@ -62,14 +62,36 @@ def parse_text_to_task(user_text: str):
         print(f"Error parsing task: {e}")
         return None
 
-def save_to_supabase(task_data: TaskSchema):
+def get_user_by_phone_number(phone_number: str):
+    """Look up user by phone number from the profiles table"""
+    try:
+        # Clean phone number format (remove + and spaces, keep digits)
+        cleaned_phone = ''.join(filter(str.isdigit, phone_number))
+        # Also try with + prefix
+        phone_variations = [cleaned_phone, f"+{cleaned_phone}", phone_number]
+        
+        for phone in phone_variations:
+            response = supabase.table("profiles").select("id").eq("phone_number", phone).execute()
+            if response.data and len(response.data) > 0:
+                user_id = response.data[0]["id"]
+                print(f"Found user {user_id} for phone {phone}")
+                return user_id
+        
+        print(f"No user found for phone number: {phone_number}")
+        return None
+    except Exception as e:
+        print(f"Error looking up user by phone: {e}")
+        return None
+
+def save_to_supabase(task_data: TaskSchema, user_id: str):
     try:
         data_payload = task_data.model_dump()
+        data_payload["user_id"] = user_id
         
         response = supabase.table("tasks").insert(data_payload).execute()
         
         if response.data:
-            print(f"Saved to DB: {task_data.task_name} ({task_data.due_date})")
+            print(f"Saved to DB: {task_data.task_name} ({task_data.due_date}) for user {user_id}")
             return response.data
         else:
             print("Database insert returned empty response.")
@@ -97,7 +119,15 @@ def sms_webhook():
     if task_object:
         print(f"🤖 AI Parsed: {task_object.task_name}")
         
-        result = save_to_supabase(task_object)
+        # Look up user by phone number
+        user_id = get_user_by_phone_number(from_number)
+        
+        if not user_id:
+            resp = MessagingResponse()
+            resp.message("❌ No account found for this phone number. Please sign up at the web app first and add your phone number.")
+            return Response(str(resp), mimetype='text/xml'), 200
+        
+        result = save_to_supabase(task_object, user_id)
         
         if result:
             resp = MessagingResponse()
@@ -126,5 +156,6 @@ def health_check():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='localhost', port=port, debug=True)
+    port = int(os.environ.get('PORT', 8080))
+    # Cloud Run requires binding to 0.0.0.0, not localhost
+    app.run(host='0.0.0.0', port=port, debug=False)

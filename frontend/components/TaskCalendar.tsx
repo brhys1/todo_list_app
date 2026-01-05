@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Calendar from 'react-calendar'
 import 'react-calendar/dist/Calendar.css'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 interface Task {
   id: string
@@ -12,25 +13,27 @@ interface Task {
   due_time: string | null
   priority: string
   category: string
+  user_id: string
 }
 
 type Value = Date | null
 
 export default function TaskCalendar() {
+  const { user, signOut } = useAuth()
   const [date, setDate] = useState<Value>(new Date())
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchTasks()
-  }, [])
-
-  async function fetchTasks() {
+  // Fetch tasks from the Supabase database for the current user
+  const fetchTasks = useCallback(async () => {
+    if (!user) return
+    
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', user.id)
         .order('due_date', { ascending: true })
         .order('due_time', { ascending: true, nullsFirst: false })
 
@@ -45,7 +48,43 @@ export default function TaskCalendar() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+
+    fetchTasks()
+    // Set up connection to the Supabase to listen for task changes
+    const channel = supabase
+      .channel('tasks-changes', {
+        config: {
+          broadcast: { self: false },
+        },
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Task change detected:', payload.eventType, payload)
+          fetchTasks()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to task changes')
+        }
+      })
+      
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, fetchTasks])
 
   // Get selected date in YYYY-MM-DD format
   const selectedDateString = useMemo(() => {
@@ -53,7 +92,7 @@ export default function TaskCalendar() {
     return date.toISOString().split('T')[0]
   }, [date])
 
-  // Format selected date for display
+  // Format selected date for display in the UI
   const formattedSelectedDate = useMemo(() => {
     if (!date) return 'Select a date'
     return date.toLocaleDateString('en-US', { 
@@ -140,9 +179,18 @@ export default function TaskCalendar() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-6 min-h-screen bg-black">
-      <h1 className="text-4xl font-bold mb-8 text-center text-white">
-        Task Calendar
-      </h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold text-white">Task Calendar</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-400 text-sm">{user?.email}</span>
+          <button
+            onClick={signOut}
+            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Calendar Section - Now takes up 2 columns on large screens */}

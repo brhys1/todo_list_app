@@ -1,0 +1,27 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.git/
+.gitignore
+README.md
+.env*.local
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.txt
+passwords.txt
+twilio_2FA_recovery_code.txt
+.venv/
+venv/
+env/
+
