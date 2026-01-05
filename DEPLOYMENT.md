@@ -53,6 +53,10 @@ This guide walks you through deploying the Todo List App to Google Cloud Platfor
 
    gcloud projects add-iam-policy-binding ${PROJECT_ID} \
      --member="serviceAccount:${SERVICE_ACCOUNT}" \
+     --role="roles/artifactregistry.writer"
+
+   gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+     --member="serviceAccount:${SERVICE_ACCOUNT}" \
      --role="roles/iam.serviceAccountUser"
    ```
 
