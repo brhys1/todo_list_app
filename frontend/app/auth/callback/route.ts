@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   // Get the correct origin from the Host header (Cloud Run provides this)
@@ -37,25 +37,12 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Create a server-side Supabase client for code exchange
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables')
-    return NextResponse.redirect(
-      `${origin}?error=auth_error&details=Server configuration error`
-    )
-  }
-
-  // Create Supabase client with PKCE flow
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      flowType: 'pkce',
-    },
-  })
+  // Create server-side Supabase client with cookie support
+  // This will read the PKCE code verifier from cookies
+  const supabase = await createClient()
 
   // Exchange the authorization code for a session
+  // The code verifier will be read from cookies automatically
   const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
   if (exchangeError) {
@@ -76,8 +63,7 @@ export async function GET(request: NextRequest) {
   console.log('User ID:', data.session.user.id)
 
   // Redirect to home
-  // The session will be available to the client-side Supabase client
-  // Note: For proper cookie handling, consider using @supabase/ssr package
+  // The session cookies are automatically set by @supabase/ssr
   return NextResponse.redirect(origin)
 }
 
