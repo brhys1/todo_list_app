@@ -16,11 +16,11 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 # Expose port (Cloud Run uses PORT env var)
+ENV PORT=8080
 EXPOSE 8080
 
 # Run the application
 ENV FLASK_APP=main.py
-ENV PORT=8080
 
 CMD uv run python main.py
 
