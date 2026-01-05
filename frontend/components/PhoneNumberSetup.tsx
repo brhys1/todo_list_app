@@ -195,13 +195,19 @@ export default function PhoneNumberSetup() {
             <p className="text-gray-400 mb-6">
               Your phone number has been added to your profile.
             </p>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
               <p className="text-sm text-gray-400 mb-2">Text your tasks to:</p>
               <p className="text-xl font-semibold text-white">(484) 939-6264</p>
               <p className="text-xs text-gray-500 mt-2">
                 Send a message like "Buy milk tomorrow" or "Meeting at 3pm Friday"
               </p>
             </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            >
+              Continue to Calendar
+            </button>
           </div>
         </div>
       </div>
