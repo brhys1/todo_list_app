@@ -95,7 +95,7 @@ def parse_text_to_task(user_text: str, user_id: str):
 
     try:
         response = model.generate_content(prompt)
-         
+        
         task_data = TaskSchema.model_validate_json(response.text)
         return task_data
         
