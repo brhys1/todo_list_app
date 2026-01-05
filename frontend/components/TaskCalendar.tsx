@@ -183,6 +183,7 @@ export default function TaskCalendar() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold text-white">Task Calendar</h1>
         <div className="flex items-center gap-4">
+          <span className="text-gray-400 text-sm">Text tasks to: (484) 939-6264</span>
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
             onClick={signOut}
@@ -190,18 +191,6 @@ export default function TaskCalendar() {
           >
             Sign Out
           </button>
-        </div>
-      </div>
-
-      {/* SMS Phone Number Info */}
-      <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">📱</span>
-          <div>
-            <p className="text-sm text-gray-300 mb-1">Text your tasks to:</p>
-            <p className="text-lg font-semibold text-white">(484) 939-6264</p>
-            <p className="text-xs text-gray-400 mt-1">Send messages like "Buy milk tomorrow" or "Meeting at 3pm Friday"</p>
-          </div>
         </div>
       </div>
       
