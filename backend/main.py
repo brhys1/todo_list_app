@@ -174,9 +174,6 @@ def sms_webhook():
     
     if task_object:
         print(f"🤖 AI Parsed: {task_object.task_name}")
-            resp = MessagingResponse()
-            resp.message("❌ No account found for this phone number. Please sign up at the web app first and add your phone number.")
-            return Response(str(resp), mimetype='text/xml'), 200
         
         result = save_to_supabase(task_object, user_id)
         
