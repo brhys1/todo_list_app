@@ -21,5 +21,7 @@ EXPOSE 8080
 # Run the application
 ENV FLASK_APP=main.py
 ENV PORT=8080
-CMD uv run python main.py
+
+# Ensure the app starts and listens on the correct port
+CMD ["sh", "-c", "uv run python main.py"]
 

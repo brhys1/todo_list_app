@@ -16,8 +16,18 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-genai.configure(api_key=GOOGLE_API_KEY)
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Initialize clients (will fail gracefully if env vars are missing)
+try:
+    if GOOGLE_API_KEY:
+        genai.configure(api_key=GOOGLE_API_KEY)
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        print("Warning: Supabase credentials not found. Some features may not work.")
+        supabase = None
+except Exception as e:
+    print(f"Error initializing clients: {e}")
+    supabase = None
 
 app = Flask(__name__)
 
@@ -30,6 +40,8 @@ class TaskSchema(BaseModel):
 
 def get_user_timezone(user_id: str) -> str:
     """Get user's timezone from profile, default to America/New_York (Eastern Time)"""
+    if not supabase:
+        return "America/New_York"
     try:
         response = supabase.table("profiles").select("timezone").eq("id", user_id).execute()
         if response.data and len(response.data) > 0 and response.data[0].get("timezone"):
@@ -86,6 +98,9 @@ def parse_text_to_task(user_text: str, user_id: str):
 
 def get_user_by_phone_number(phone_number: str):
     """Look up user by phone number from the profiles table"""
+    if not supabase:
+        print("Supabase client not initialized")
+        return None
     try:
         # Clean phone number format (remove + and spaces, keep digits)
         cleaned_phone = ''.join(filter(str.isdigit, phone_number))
@@ -106,6 +121,9 @@ def get_user_by_phone_number(phone_number: str):
         return None
 
 def save_to_supabase(task_data: TaskSchema, user_id: str):
+    if not supabase:
+        print("Supabase client not initialized")
+        return None
     try:
         data_payload = task_data.model_dump()
         data_payload["user_id"] = user_id
@@ -183,4 +201,9 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8080))
     # Cloud Run requires binding to 0.0.0.0, not localhost
+    print(f"Starting Flask app on 0.0.0.0:{port}")
     app.run(host='0.0.0.0', port=port, debug=False)
+else:
+    # For production servers like gunicorn
+    port = int(os.environ.get('PORT', 8080))
+    print(f"Flask app configured for port {port}")
