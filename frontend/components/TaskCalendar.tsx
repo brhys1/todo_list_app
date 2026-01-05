@@ -180,9 +180,9 @@ export default function TaskCalendar() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-6 min-h-screen bg-black">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <h1 className="text-4xl font-bold text-white">Task Calendar</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
           <span className="text-gray-400 text-sm">Text tasks to: (484) 939-6264</span>
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
