@@ -9,4 +9,12 @@ How to run locally
         - cd backend && uv run main.py
     - running the frontend
         - cd frontend && npm run dev
+    
+Link to the project:
+    - https://todo-list-frontend-338641326538.us-central1.run.app/
+
+todos: 
+    - make sure to get approval for anyone to use this
+    - figure how to make it not need wifi to display and just show last state
+    - possibly as a 
 

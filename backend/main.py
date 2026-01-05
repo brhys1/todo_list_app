@@ -17,16 +17,23 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Initialize clients (will fail gracefully if env vars are missing)
+supabase = None
 try:
     if GOOGLE_API_KEY:
         genai.configure(api_key=GOOGLE_API_KEY)
+        print("Google AI configured successfully")
+    else:
+        print("Warning: GOOGLE_API_KEY not found. AI features may not work.")
+    
     if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("Supabase client initialized successfully")
     else:
         print("Warning: Supabase credentials not found. Some features may not work.")
-        supabase = None
 except Exception as e:
     print(f"Error initializing clients: {e}")
+    import traceback
+    traceback.print_exc()
     supabase = None
 
 app = Flask(__name__)
@@ -198,12 +205,17 @@ def health_check():
     """Health check endpoint"""
     return {"status": "ok"}, 200
 
+# Always start the app when this file is run
+port = int(os.environ.get('PORT', 8080))
+print(f"Flask app starting on 0.0.0.0:{port}")
+print(f"Environment variables: PORT={port}")
+
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 8080))
     # Cloud Run requires binding to 0.0.0.0, not localhost
-    print(f"Starting Flask app on 0.0.0.0:{port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
-else:
-    # For production servers like gunicorn
-    port = int(os.environ.get('PORT', 8080))
-    print(f"Flask app configured for port {port}")
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    except Exception as e:
+        print(f"Error starting Flask app: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
