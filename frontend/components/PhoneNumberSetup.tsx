@@ -197,7 +197,7 @@ export default function PhoneNumberSetup() {
             </p>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
               <p className="text-sm text-gray-400 mb-2">Text your tasks to:</p>
-              <p className="text-xl font-semibold text-white">(484) 939-6264</p>
+              <p className="text-xl font-semibold text-white">(855) 940-3326</p>
               <p className="text-xs text-gray-500 mt-2">
                 Send a message like "Buy milk tomorrow" or "Meeting at 3pm Friday"
               </p>

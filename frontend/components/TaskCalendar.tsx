@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Calendar from 'react-calendar'
+// @ts-ignore: CSS side-effect import without type declarations
 import 'react-calendar/dist/Calendar.css'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
@@ -183,7 +184,7 @@ export default function TaskCalendar() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <h1 className="text-4xl font-bold text-white">Task Calendar</h1>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-          <span className="text-gray-400 text-sm">Text tasks to: (484) 939-6264</span>
+          <span className="text-gray-400 text-sm">Text tasks to: (855) 940-3326</span>
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
             onClick={signOut}
