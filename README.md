@@ -24,5 +24,6 @@ todos:
     - send tasks to gcal?
     - figure how to make it not need wifi to display and just show last state
     - possibly as a widget
+    - confirmation text
 
 
