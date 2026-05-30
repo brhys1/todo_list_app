@@ -11,6 +11,7 @@ export default function Home() {
   const { user, loading } = useAuth()
   const [hasPhoneNumber, setHasPhoneNumber] = useState<boolean | null>(null)
   const [checkingPhone, setCheckingPhone] = useState(true)
+  const [showSettings, setShowSettings] = useState(false)
 
   // Check if user has phone number
   useEffect(() => {
@@ -62,10 +63,10 @@ export default function Home() {
     return <LoginScreen />
   }
 
-  // Show phone number setup if user doesn't have a phone number
-  if (hasPhoneNumber === false) {
-    return <PhoneNumberSetup />
+  // Show phone number setup if user doesn't have a phone number, or if they opened settings
+  if (hasPhoneNumber === false || showSettings) {
+    return <PhoneNumberSetup onDone={() => setShowSettings(false)} />
   }
 
-  return <TaskCalendar />
+  return <TaskCalendar onOpenSettings={() => setShowSettings(true)} />
 }

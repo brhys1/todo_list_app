@@ -14,11 +14,8 @@ Link to the project:
     - https://todo-list-frontend-338641326538.us-central1.run.app/
 
 todos: 
-    - make sure to get approval for anyone to use this
-    - get the ai to extract multiple tasks from one text
     - better ui holy (lowkey kavya can you clutch this?)
     - set up automated text reminders (probably have to upgrade twillio for this but just use cron job github action)
-    - allow tasks to me checked off or the times adjusted (both by dragging and by texting the number)
     - family plan set up as well where people get their own number
     - copy button next to the number
     - send tasks to gcal?
