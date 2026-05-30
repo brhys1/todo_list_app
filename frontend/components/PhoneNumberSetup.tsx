@@ -57,7 +57,7 @@ const TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'São Paulo (BRT)' },
 ]
 
-export default function PhoneNumberSetup() {
+export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
   const { user } = useAuth()
   const [countryCode, setCountryCode] = useState('+1')
   const [phoneNumber, setPhoneNumber] = useState('')
@@ -66,6 +66,15 @@ export default function PhoneNumberSetup() {
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
   const [hasPhoneNumber, setHasPhoneNumber] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [smsOptIn, setSmsOptIn] = useState(false)
+  const [phoneCopied, setPhoneCopied] = useState(false)
+
+  const copyPhone = () => {
+    navigator.clipboard.writeText('8559403326')
+    setPhoneCopied(true)
+    setTimeout(() => setPhoneCopied(false), 2000)
+  }
 
   // Check if user already has a phone number
   useEffect(() => {
@@ -80,7 +89,7 @@ export default function PhoneNumberSetup() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('phone_number, timezone')
+          .select('phone_number, timezone, sms_opt_in')
           .eq('id', user.id)
           .single()
 
@@ -103,10 +112,8 @@ export default function PhoneNumberSetup() {
               setPhoneNumber(existingPhone.substring(1))
             }
           }
-          // Set timezone if it exists, otherwise keep default
-          if (data.timezone) {
-            setTimezone(data.timezone)
-          }
+          if (data.timezone) setTimezone(data.timezone)
+          if (data.sms_opt_in) setSmsOptIn(true)
         }
       } catch (err) {
         console.error('Error:', err)
@@ -148,6 +155,7 @@ export default function PhoneNumberSetup() {
             id: user.id,
             phone_number: formattedPhone,
             timezone: timezone,
+            sms_opt_in: smsOptIn,
             updated_at: new Date().toISOString(),
           },
           {
@@ -163,7 +171,8 @@ export default function PhoneNumberSetup() {
       }
 
       setHasPhoneNumber(true)
-      // Don't reload - let the success message display
+      setIsEditing(false)
+      onDone?.()
     } catch (err) {
       console.error('Error:', err)
       setError('An unexpected error occurred. Please try again.')
@@ -179,7 +188,7 @@ export default function PhoneNumberSetup() {
     )
   }
 
-  if (hasPhoneNumber) {
+  if (hasPhoneNumber && !isEditing) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="bg-gray-900 rounded-xl shadow-2xl p-8 border border-gray-800 max-w-md w-full">
@@ -197,16 +206,29 @@ export default function PhoneNumberSetup() {
             </p>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
               <p className="text-sm text-gray-400 mb-2">Text your tasks to:</p>
-              <p className="text-xl font-semibold text-white">(855) 940-3326</p>
+              <button
+                onClick={copyPhone}
+                className="flex items-center justify-center gap-2 w-full hover:text-gray-300 transition-colors"
+                title="Copy phone number"
+              >
+                <span className="text-xl font-semibold text-white">(855) 940-3326</span>
+                <span className="text-sm text-gray-400">{phoneCopied ? '✓ Copied' : '⎘'}</span>
+              </button>
               <p className="text-xs text-gray-500 mt-2">
                 Send a message like "Buy milk tomorrow" or "Meeting at 3pm Friday"
               </p>
             </div>
             <button
-              onClick={() => window.location.reload()}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+              onClick={() => onDone ? onDone() : window.location.reload()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors mb-3"
             >
               Continue to Calendar
+            </button>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            >
+              Edit Settings
             </button>
           </div>
         </div>
@@ -298,6 +320,22 @@ export default function PhoneNumberSetup() {
             </p>
           </div>
 
+          <div className="flex items-start gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+            <input
+              type="checkbox"
+              id="smsOptIn"
+              checked={smsOptIn}
+              onChange={(e) => setSmsOptIn(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-blue-500 flex-shrink-0 cursor-pointer"
+              disabled={loading}
+            />
+            <label htmlFor="smsOptIn" className="text-xs text-gray-400 cursor-pointer leading-relaxed">
+              <span className="text-gray-300 font-medium">Receive daily task reminders via SMS (optional)</span>
+              <br />
+              By checking this box, you agree to receive text message reminders from Task Calendar. Message and data rates may apply. Message frequency varies. You can reply STOP to opt-out at any time.
+            </label>
+          </div>
+
           {error && (
             <div className="bg-red-900/30 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
               {error}
@@ -309,8 +347,17 @@ export default function PhoneNumberSetup() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
           >
-            {loading ? 'Saving...' : 'Save Phone Number'}
+            {loading ? 'Saving...' : isEditing ? 'Update Settings' : 'Save Phone Number'}
           </button>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => { setIsEditing(false); onDone?.() }}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          )}
         </form>
       </div>
     </div>
