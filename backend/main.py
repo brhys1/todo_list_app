@@ -20,6 +20,10 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+TWILIO_SID = os.getenv("TWILLIO_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILLIO_AUTH_TOKEN")
+TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER")
+NOTIFICATION_SECRET = os.getenv("NOTIFICATION_SECRET")
 
 # Google Calendar OAuth config
 GCAL_CLIENT_ID = os.getenv("GOOGLE_CALENDAR_CLIENT_ID")
@@ -213,6 +217,11 @@ def save_to_supabase(task_data: TaskSchema, user_id: str):
     except Exception as e:
         print(f"Database Error: {e}")
         return None
+
+def send_sms(to_number: str, message: str):
+    from twilio.rest import Client
+    client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+    client.messages.create(to=to_number, from_=TWILIO_FROM_NUMBER, body=message)
 
 def sms_reply(text: str) -> Response:
     resp = MessagingResponse()
@@ -460,6 +469,93 @@ def gcal_callback():
 @app.route('/health', methods=['GET'])
 def health_check():
     return {"status": "ok"}, 200
+
+@app.route('/notifications/send', methods=['POST'])
+def send_notifications():
+    auth = request.headers.get("Authorization", "")
+    if not NOTIFICATION_SECRET or auth != f"Bearer {NOTIFICATION_SECRET}":
+        return {"error": "Unauthorized"}, 401
+
+    if not supabase:
+        return {"error": "Supabase not configured"}, 500
+
+    users = supabase.table("profiles").select(
+        "id, phone_number, timezone, "
+        "reminder_morning_time, reminder_evening_time, "
+        "reminder_morning_enabled, reminder_evening_enabled, "
+        "last_morning_reminder_date, last_evening_reminder_date"
+    ).eq("sms_opt_in", True).not_.is_("phone_number", "null").execute()
+
+    sent = 0
+    skipped = 0
+
+    for user in (users.data or []):
+        user_id = user["id"]
+        phone = user["phone_number"]
+        tz_str = user.get("timezone") or "America/New_York"
+
+        try:
+            tz = ZoneInfo(tz_str)
+        except Exception:
+            tz = ZoneInfo("America/New_York")
+
+        now = datetime.datetime.now(tz)
+        today_str = now.strftime("%Y-%m-%d")
+        current_minutes = now.hour * 60 + now.minute
+
+        def _in_window(time_str: str) -> bool:
+            try:
+                h, m = map(int, time_str.split(":"))
+                return abs(current_minutes - (h * 60 + m)) <= 15
+            except Exception:
+                return False
+
+        morning_time = user.get("reminder_morning_time") or "08:00"
+        evening_time = user.get("reminder_evening_time") or "18:00"
+        morning_enabled = user.get("reminder_morning_enabled", True)
+        evening_enabled = user.get("reminder_evening_enabled", True)
+        last_morning = user.get("last_morning_reminder_date")
+        last_evening = user.get("last_evening_reminder_date")
+
+        # Morning reminder
+        if morning_enabled and last_morning != today_str and _in_window(morning_time):
+            tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
+            if tasks.data:
+                task_lines = "\n".join(f"• {t['task_name']}" for t in tasks.data)
+                n = len(tasks.data)
+                msg = f"Good morning! You have {n} task{'s' if n != 1 else ''} due today:\n{task_lines}\nReply to add or complete tasks."
+                try:
+                    send_sms(phone, msg)
+                    supabase.table("profiles").update({"last_morning_reminder_date": today_str}).eq("id", user_id).execute()
+                    sent += 1
+                except Exception as e:
+                    print(f"Error sending morning SMS to {user_id}: {e}")
+                    skipped += 1
+            else:
+                skipped += 1
+        else:
+            if not morning_enabled or last_morning == today_str or not _in_window(morning_time):
+                skipped += 1
+
+        # Evening reminder
+        if evening_enabled and last_evening != today_str and _in_window(evening_time):
+            tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
+            if tasks.data:
+                task_lines = "\n".join(f"• {t['task_name']}" for t in tasks.data)
+                n = len(tasks.data)
+                msg = f"Evening check-in! {n} task{'s' if n != 1 else ''} still incomplete today:\n{task_lines}\nReply to mark tasks done."
+                try:
+                    send_sms(phone, msg)
+                    supabase.table("profiles").update({"last_evening_reminder_date": today_str}).eq("id", user_id).execute()
+                    sent += 1
+                except Exception as e:
+                    print(f"Error sending evening SMS to {user_id}: {e}")
+                    skipped += 1
+            else:
+                skipped += 1
+
+    return {"sent": sent, "skipped": skipped}, 200
+
 
 port = int(os.environ.get('PORT', 5000))
 print(f"Flask app starting on 0.0.0.0:{port}")

@@ -63,6 +63,8 @@ jobs:
             --set-env-vars FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
             --set-env-vars TWILLIO_SID="${{ secrets.TWILLIO_SID }}" \
             --set-env-vars TWILLIO_AUTH_TOKEN="${{ secrets.TWILLIO_AUTH_TOKEN }}" \
+            --set-env-vars TWILIO_FROM_NUMBER="${{ secrets.TWILIO_FROM_NUMBER }}" \
+            --set-env-vars NOTIFICATION_SECRET="${{ secrets.NOTIFICATION_SECRET }}" \
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \

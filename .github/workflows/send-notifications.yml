@@ -1,0 +1,17 @@
+name: Send Daily Reminders
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger notification endpoint
+        run: |
+          curl -s -X POST "${{ secrets.BACKEND_URL }}/notifications/send" \
+            -H "Authorization: Bearer ${{ secrets.NOTIFICATION_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail

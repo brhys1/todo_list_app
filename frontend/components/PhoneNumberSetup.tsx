@@ -138,6 +138,10 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
   const [hasPhoneNumber, setHasPhoneNumber] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [smsOptIn, setSmsOptIn] = useState(false)
+  const [morningEnabled, setMorningEnabled] = useState(true)
+  const [eveningEnabled, setEveningEnabled] = useState(true)
+  const [morningTime, setMorningTime] = useState('08:00')
+  const [eveningTime, setEveningTime] = useState('18:00')
   const [phoneCopied, setPhoneCopied] = useState(false)
 
   const copyPhone = () => {
@@ -154,7 +158,7 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('phone_number, timezone, sms_opt_in')
+          .select('phone_number, timezone, sms_opt_in, reminder_morning_enabled, reminder_evening_enabled, reminder_morning_time, reminder_evening_time')
           .eq('id', user.id)
           .single()
 
@@ -179,6 +183,10 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
           }
           if (data.timezone) setTimezone(data.timezone)
           if (data.sms_opt_in) setSmsOptIn(true)
+          if (data.reminder_morning_enabled != null) setMorningEnabled(data.reminder_morning_enabled)
+          if (data.reminder_evening_enabled != null) setEveningEnabled(data.reminder_evening_enabled)
+          if (data.reminder_morning_time) setMorningTime(data.reminder_morning_time)
+          if (data.reminder_evening_time) setEveningTime(data.reminder_evening_time)
         }
       } catch (err) {
         console.error('Error:', err)
@@ -205,7 +213,7 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
       const { error: updateError } = await supabase
         .from('profiles')
         .upsert(
-          { id: user.id, phone_number: countryCode + cleaned, timezone, sms_opt_in: smsOptIn, updated_at: new Date().toISOString() },
+          { id: user.id, phone_number: countryCode + cleaned, timezone, sms_opt_in: smsOptIn, reminder_morning_enabled: morningEnabled, reminder_evening_enabled: eveningEnabled, reminder_morning_time: morningTime, reminder_evening_time: eveningTime, updated_at: new Date().toISOString() },
           { onConflict: 'id' }
         )
 
@@ -372,29 +380,92 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
           </div>
 
           <div
-            className="flex items-start gap-3 rounded-xl p-4 cursor-pointer"
-            style={{ background: '#0f0f0f', border: '1px solid #1c1c1c' }}
-            onClick={() => !loading && setSmsOptIn(!smsOptIn)}
+            className="rounded-xl overflow-hidden"
+            style={{ border: '1px solid #1c1c1c' }}
           >
             <div
-              className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-colors"
-              style={{
-                background: smsOptIn ? '#7c3aed' : 'transparent',
-                border: `1px solid ${smsOptIn ? '#7c3aed' : '#333333'}`,
-              }}
+              className="flex items-start gap-3 p-4 cursor-pointer"
+              style={{ background: '#0f0f0f' }}
+              onClick={() => !loading && setSmsOptIn(!smsOptIn)}
             >
-              {smsOptIn && (
-                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
+              <div
+                className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-colors"
+                style={{
+                  background: smsOptIn ? '#7c3aed' : 'transparent',
+                  border: `1px solid ${smsOptIn ? '#7c3aed' : '#333333'}`,
+                }}
+              >
+                {smsOptIn && (
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white leading-none mb-1">Daily SMS reminders</p>
+                <p className="text-xs leading-relaxed" style={{ color: '#52525b' }}>
+                  Receive a daily text with your upcoming tasks. Msg &amp; data rates may apply. Reply STOP to opt out.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-white leading-none mb-1">Daily SMS reminders</p>
-              <p className="text-xs leading-relaxed" style={{ color: '#52525b' }}>
-                Receive a daily text with your upcoming tasks. Msg & data rates may apply. Reply STOP to opt out.
-              </p>
-            </div>
+
+            {smsOptIn && (
+              <div style={{ background: '#080808', borderTop: '1px solid #1c1c1c' }} className="px-4 py-3 space-y-3">
+                {/* Morning reminder row */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer"
+                    style={{
+                      background: morningEnabled ? '#7c3aed' : 'transparent',
+                      border: `1px solid ${morningEnabled ? '#7c3aed' : '#333333'}`,
+                    }}
+                    onClick={() => !loading && setMorningEnabled(!morningEnabled)}
+                  >
+                    {morningEnabled && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-xs text-white flex-1">Morning reminder</span>
+                  <input
+                    type="time"
+                    value={morningTime}
+                    onChange={(e) => setMorningTime(e.target.value)}
+                    disabled={loading || !morningEnabled}
+                    className="rounded-lg px-2 py-1 text-xs transition-colors disabled:opacity-40"
+                    style={{ background: '#111111', border: '1px solid #222222', color: '#ffffff', colorScheme: 'dark' }}
+                  />
+                </div>
+
+                {/* Evening reminder row */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer"
+                    style={{
+                      background: eveningEnabled ? '#7c3aed' : 'transparent',
+                      border: `1px solid ${eveningEnabled ? '#7c3aed' : '#333333'}`,
+                    }}
+                    onClick={() => !loading && setEveningEnabled(!eveningEnabled)}
+                  >
+                    {eveningEnabled && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-xs text-white flex-1">Evening reminder</span>
+                  <input
+                    type="time"
+                    value={eveningTime}
+                    onChange={(e) => setEveningTime(e.target.value)}
+                    disabled={loading || !eveningEnabled}
+                    className="rounded-lg px-2 py-1 text-xs transition-colors disabled:opacity-40"
+                    style={{ background: '#111111', border: '1px solid #222222', color: '#ffffff', colorScheme: 'dark' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (

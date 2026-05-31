@@ -14,10 +14,8 @@ Link to the project:
     - https://todo-list-frontend-338641326538.us-central1.run.app/
 
 todos: 
-    - better ui holy (lowkey kavya can you clutch this?)
     - set up automated text reminders (probably have to upgrade twillio for this but just use cron job github action)
     - family plan set up as well where people get their own number
-    - send tasks to gcal?
     - figure how to make it not need wifi to display and just show last state
     - possibly as a widget
     - confirmation text
