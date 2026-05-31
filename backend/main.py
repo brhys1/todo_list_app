@@ -5,10 +5,14 @@ from datetime import timezone
 from zoneinfo import ZoneInfo
 from google import genai
 from google.genai import types
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from googleapiclient.discovery import build
 from supabase import create_client, Client
 from pydantic import BaseModel, Field
 from typing import Optional
-from flask import Flask, request, Response
+from flask import Flask, request, Response, redirect
+from flask_cors import CORS
 from twilio.twiml.messaging_response import MessagingResponse
 
 load_dotenv()
@@ -16,6 +20,14 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Google Calendar OAuth config
+GCAL_CLIENT_ID = os.getenv("GOOGLE_CALENDAR_CLIENT_ID")
+GCAL_CLIENT_SECRET = os.getenv("GOOGLE_CALENDAR_CLIENT_SECRET")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+GCAL_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+GCAL_REDIRECT_URI = f"{BACKEND_URL}/auth/google/calendar/callback"
 
 # Initialize clients (will fail gracefully if env vars are missing)
 supabase = None
@@ -39,6 +51,7 @@ except Exception as e:
     supabase = None
 
 app = Flask(__name__)
+CORS(app, origins=[FRONTEND_URL])
 
 class TaskSchema(BaseModel):
     task_name: str = Field(description="The core action item (e.g., 'Buy Milk').")
@@ -229,6 +242,7 @@ def sms_webhook():
         if not task:
             return sms_reply("❌ Couldn't find that task. Try using the task name.")
         supabase.table("tasks").update({"completed": True}).eq("id", task["id"]).execute()
+        delete_gcal_event(user_id, task.get("gcal_event_id"))
         return sms_reply(f"✅ Marked done: {task['task_name']}")
 
     elif action.action == "update":
@@ -243,6 +257,16 @@ def sms_webhook():
         if not updates:
             return sms_reply("❌ I didn't catch what to update. Please include a new date or time.")
         supabase.table("tasks").update(updates).eq("id", task["id"]).execute()
+        # Sync updated date/time to GCal
+        from types import SimpleNamespace
+        updated_task = SimpleNamespace(
+            task_name=task["task_name"],
+            due_date=updates.get("due_date", task["due_date"]),
+            due_time=updates.get("due_time", task.get("due_time")),
+            priority=task.get("priority", "Medium"),
+            category=task.get("category", ""),
+        )
+        sync_task_to_gcal(updated_task, user_id, task.get("gcal_event_id"))
         new_date = updates.get("due_date", task["due_date"])
         new_time = updates.get("due_time", task.get("due_time"))
         reply = f"✅ Updated: {task['task_name']} → {new_date}"
@@ -260,6 +284,11 @@ def sms_webhook():
             result = save_to_supabase(task, user_id)
             if result:
                 saved.append(task)
+                # Sync to GCal and store the event ID back on the task
+                task_id = result[0]["id"]
+                gcal_event_id = sync_task_to_gcal(task, user_id)
+                if gcal_event_id:
+                    supabase.table("tasks").update({"gcal_event_id": gcal_event_id}).eq("id", task_id).execute()
 
         if not saved:
             return sms_reply("Failed to save task to database. Please try again.")
@@ -283,11 +312,156 @@ def sms_webhook():
         return sms_reply(reply)
 
 
+
+def get_gcal_service(user_id: str):
+    """Build an authenticated Google Calendar service for a user, refreshing token if needed."""
+    if not supabase or not GCAL_CLIENT_ID and GCAL_CLIENT_SECRET:
+        return None
+    try:
+        resp = supabase.table("profiles").select(
+            "gcal_access_token, gcal_refresh_token, gcal_token_expiry"
+        ).eq("id", user_id).single().execute()
+        data = resp.data
+        if not data or not data.get("gcal_refresh_token"):
+            return None
+
+        creds = Credentials(
+            token=data["gcal_access_token"],
+            refresh_token=data["gcal_refresh_token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=GCAL_CLIENT_ID,
+            client_secret=GCAL_CLIENT_SECRET,
+        )
+
+        if not creds.valid:
+            creds.refresh(GoogleAuthRequest())
+            supabase.table("profiles").update({
+                "gcal_access_token": creds.token,
+                "gcal_token_expiry": creds.expiry.isoformat() if creds.expiry else None,
+            }).eq("id", user_id).execute()
+
+        return build("calendar", "v3", credentials=creds)
+    except Exception as e:
+        print(f"Error building GCal service for {user_id}: {e}")
+        return None
+
+
+def sync_task_to_gcal(task_data, user_id: str, gcal_event_id: str = None) -> Optional[str]:
+    """Push a task to Google Tasks. Returns the task id."""
+    service = get_gcal_service(user_id)
+    if not service:
+        return gcal_event_id  # user not connected, no-op
+
+    user_tz = get_user_timezone(user_id)
+
+    if task_data.due_time:
+        start_dt = f"{task_data.due_date}T{task_data.due_time}:00"
+        start = datetime.datetime.fromisoformat(start_dt)
+        end = (start + datetime.timedelta(hours=0.25)).isoformat()
+        start_obj = {"dateTime": start_dt, "timeZone": user_tz}
+        end_obj = {"dateTime": end, "timeZone": user_tz}
+    else:
+        start_obj = {"date": task_data.due_date}
+        end_obj = {"date": task_data.due_date}
+
+    event_body = {
+        "summary": task_data.task_name,
+        "description": f"Priority: {task_data.priority}\nCategory: {task_data.category}",
+        "start": start_obj,
+        "end": end_obj,
+    }
+
+    try:
+        if gcal_event_id:
+            try:
+                result = service.events().update(
+                    calendarId="primary", eventId=gcal_event_id, body=event_body
+                ).execute()
+                return result.get("id")
+            except Exception:
+                # Event not found (e.g. stale ID from a previous API) — insert fresh
+                pass
+        result = service.events().insert(calendarId="primary", body=event_body).execute()
+        return result.get("id")
+    except Exception as e:
+        print(f"Error syncing task to GCal: {e}")
+        return gcal_event_id
+
+
+def delete_gcal_event(user_id: str, gcal_event_id: str):
+    """Delete a GCal event when a task is completed."""
+    if not gcal_event_id:
+        return
+    service = get_gcal_service(user_id)
+    if not service:
+        return
+    try:
+        service.events().delete(calendarId="primary", eventId=gcal_event_id).execute()
+    except Exception as e:
+        print(f"Error deleting GCal event {gcal_event_id}: {e}")
+
+
+@app.route('/auth/google/calendar', methods=['GET'])
+def gcal_auth():
+    """Return the Google OAuth URL for Calendar access."""
+    user_id = request.args.get("user_id")
+    if not user_id or not (GCAL_CLIENT_ID and GCAL_CLIENT_SECRET):
+        return {"error": "Missing user_id or client secret not configured"}, 400
+
+    from requests_oauthlib import OAuth2Session
+    oauth = OAuth2Session(GCAL_CLIENT_ID, redirect_uri=GCAL_REDIRECT_URI, scope=GCAL_SCOPES)
+    auth_url, _ = oauth.authorization_url(
+        "https://accounts.google.com/o/oauth2/auth",
+        access_type="offline",
+        prompt="consent",
+        state=user_id,
+    )
+    return {"url": auth_url}
+
+
+@app.route('/auth/google/calendar/callback', methods=['GET'])
+def gcal_callback():
+    """Handle Google OAuth callback, store tokens, redirect to frontend."""
+    import requests as http_requests
+    code = request.args.get("code")
+    user_id = request.args.get("state")
+    if not code or not user_id or not (GCAL_CLIENT_ID and GCAL_CLIENT_SECRET):
+        return "Missing code or state", 400
+
+    try:
+        resp = http_requests.post("https://oauth2.googleapis.com/token", data={
+            "client_id": GCAL_CLIENT_ID,
+            "client_secret": GCAL_CLIENT_SECRET,
+            "redirect_uri": GCAL_REDIRECT_URI,
+            "grant_type": "authorization_code",
+            "code": code,
+        })
+        tokens = resp.json()
+        if "error" in tokens:
+            print(f"GCal token error: {tokens}")
+            return redirect(f"{FRONTEND_URL}?gcal=error")
+
+        expires_in = tokens.get("expires_in", 3600)
+        expiry = (datetime.datetime.now(timezone.utc) + datetime.timedelta(seconds=expires_in)).isoformat()
+
+        supabase.table("profiles").update({
+            "gcal_access_token": tokens["access_token"],
+            "gcal_refresh_token": tokens.get("refresh_token"),
+            "gcal_token_expiry": expiry,
+            "gcal_connected": True,
+        }).eq("id", user_id).execute()
+
+        return redirect(f"{FRONTEND_URL}?gcal=connected")
+    except Exception as e:
+        print(f"GCal OAuth callback error: {e}")
+        return redirect(f"{FRONTEND_URL}?gcal=error")
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return {"status": "ok"}, 200
 
-port = int(os.environ.get('PORT', 8080))
+port = int(os.environ.get('PORT', 5000))
 print(f"Flask app starting on 0.0.0.0:{port}")
 print(f"Environment variables: PORT={port}")
 

@@ -13,4 +13,8 @@ dependencies = [
     "requests>=2.32.5",
     "dotenv>=0.9.9",
     "tzdata>=2024.1",
+    "google-auth>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "google-api-python-client>=2.0.0",
+    "flask-cors>=6.0.2",
 ]

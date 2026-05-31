@@ -29,11 +29,29 @@ export default function TaskCalendar({ onOpenSettings }: { onOpenSettings?: () =
   const [editDate, setEditDate] = useState('')
   const [editTime, setEditTime] = useState('')
   const [phoneCopied, setPhoneCopied] = useState(false)
+  const [gcalConnected, setGcalConnected] = useState(false)
 
   const copyPhone = () => {
     navigator.clipboard.writeText('8559403326')
     setPhoneCopied(true)
     setTimeout(() => setPhoneCopied(false), 2000)
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('gcal') === 'connected') {
+      setGcalConnected(true)
+      window.history.replaceState({}, '', window.location.pathname)
+      setTimeout(() => setGcalConnected(false), 4000)
+    }
+  }, [])
+
+  const connectGcal = async () => {
+    if (!user) return
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+    const res = await fetch(`${backendUrl}/auth/google/calendar?user_id=${user.id}`)
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
   }
 
   const fetchTasks = useCallback(async () => {
@@ -260,6 +278,15 @@ export default function TaskCalendar({ onOpenSettings }: { onOpenSettings?: () =
             <span className="text-xs">{phoneCopied ? '✓ Copied' : '⎘'}</span>
           </button>
           <span className="text-gray-400 text-sm">{user?.email}</span>
+          {gcalConnected && (
+            <span className="text-green-400 text-sm font-medium">✓ Google Calendar connected</span>
+          )}
+          <button
+            onClick={connectGcal}
+            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Connect GCal
+          </button>
           <button
             onClick={onOpenSettings}
             className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
