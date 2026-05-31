@@ -55,6 +55,15 @@ const TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'São Paulo (BRT)' },
 ]
 
+const REMINDER_TIMES = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2)
+  const m = i % 2 === 0 ? '00' : '30'
+  const value = `${String(h).padStart(2, '0')}:${m}`
+  const period = h < 12 ? 'AM' : 'PM'
+  const display = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${m} ${period}`
+  return { value, display }
+})
+
 const inputStyle = {
   background: '#111111',
   border: '1px solid #222222',
@@ -428,14 +437,15 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
                     )}
                   </div>
                   <span className="text-xs text-white flex-1">Morning reminder</span>
-                  <input
-                    type="time"
+                  <StyledSelect
                     value={morningTime}
                     onChange={(e) => setMorningTime(e.target.value)}
                     disabled={loading || !morningEnabled}
-                    className="rounded-lg px-2 py-1 text-xs transition-colors disabled:opacity-40"
-                    style={{ background: '#111111', border: '1px solid #222222', color: '#ffffff', colorScheme: 'dark' }}
-                  />
+                  >
+                    {REMINDER_TIMES.map((t) => (
+                      <option key={t.value} value={t.value} style={{ background: '#111111' }}>{t.display}</option>
+                    ))}
+                  </StyledSelect>
                 </div>
 
                 {/* Evening reminder row */}
@@ -455,14 +465,15 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
                     )}
                   </div>
                   <span className="text-xs text-white flex-1">Evening reminder</span>
-                  <input
-                    type="time"
+                  <StyledSelect
                     value={eveningTime}
                     onChange={(e) => setEveningTime(e.target.value)}
                     disabled={loading || !eveningEnabled}
-                    className="rounded-lg px-2 py-1 text-xs transition-colors disabled:opacity-40"
-                    style={{ background: '#111111', border: '1px solid #222222', color: '#ffffff', colorScheme: 'dark' }}
-                  />
+                  >
+                    {REMINDER_TIMES.map((t) => (
+                      <option key={t.value} value={t.value} style={{ background: '#111111' }}>{t.display}</option>
+                    ))}
+                  </StyledSelect>
                 </div>
               </div>
             )}
