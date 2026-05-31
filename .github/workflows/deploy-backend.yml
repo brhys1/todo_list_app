@@ -57,6 +57,12 @@ jobs:
             --set-env-vars GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
             --set-env-vars SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --set-env-vars SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --set-env-vars GOOGLE_CALENDAR_CLIENT_ID="${{ secrets.GOOGLE_CALENDAR_CLIENT_ID }}" \
+            --set-env-vars GOOGLE_CALENDAR_CLIENT_SECRET="${{ secrets.GOOGLE_CALENDAR_CLIENT_SECRET }}" \
+            --set-env-vars BACKEND_URL="${{ secrets.BACKEND_URL }}" \
+            --set-env-vars FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
+            --set-env-vars TWILLIO_SID="${{ secrets.TWILLIO_SID }}" \
+            --set-env-vars TWILLIO_AUTH_TOKEN="${{ secrets.TWILLIO_AUTH_TOKEN }}" \
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
