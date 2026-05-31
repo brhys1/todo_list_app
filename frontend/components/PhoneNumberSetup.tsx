@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 
-// Common country codes
 const COUNTRY_CODES = [
   { code: '+1', country: 'US/Canada' },
   { code: '+44', country: 'UK' },
@@ -38,7 +37,6 @@ const COUNTRY_CODES = [
   { code: '+84', country: 'Vietnam' },
 ]
 
-// Common timezones
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
   { value: 'America/Chicago', label: 'Central Time (CT)' },
@@ -46,8 +44,8 @@ const TIMEZONES = [
   { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
   { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
   { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' },
-  { value: 'America/Toronto', label: 'Eastern Time - Toronto' },
-  { value: 'America/Vancouver', label: 'Pacific Time - Vancouver' },
+  { value: 'America/Toronto', label: 'Eastern Time — Toronto' },
+  { value: 'America/Vancouver', label: 'Pacific Time — Vancouver' },
   { value: 'Europe/London', label: 'London (GMT)' },
   { value: 'Europe/Paris', label: 'Paris (CET)' },
   { value: 'Europe/Berlin', label: 'Berlin (CET)' },
@@ -57,11 +55,83 @@ const TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'São Paulo (BRT)' },
 ]
 
+const inputStyle = {
+  background: '#111111',
+  border: '1px solid #222222',
+  color: '#ffffff',
+}
+
+const inputFocusStyle = {
+  borderColor: '#7c3aed',
+  outline: 'none',
+}
+
+function StyledInput({ type, value, onChange, placeholder, disabled, required, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      disabled={disabled}
+      required={required}
+      {...rest}
+      style={{
+        ...inputStyle,
+        ...(focused ? inputFocusStyle : {}),
+      }}
+      className="w-full rounded-xl px-3.5 py-2.5 text-sm placeholder-zinc-600 transition-colors disabled:opacity-50"
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    />
+  )
+}
+
+function StyledSelect({ value, onChange, children, disabled, required, id }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <div className="relative">
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        required={required}
+        style={{
+          ...inputStyle,
+          ...(focused ? inputFocusStyle : {}),
+          appearance: 'none',
+          WebkitAppearance: 'none',
+        }}
+        className="w-full rounded-xl px-3.5 py-2.5 pr-9 text-sm cursor-pointer transition-colors disabled:opacity-50"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      >
+        {children}
+      </select>
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+        <svg className="w-3.5 h-3.5" style={{ color: '#52525b' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="block text-xs font-medium uppercase tracking-wider mb-1.5" style={{ color: '#52525b' }}>
+      {children}
+    </label>
+  )
+}
+
 export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
   const { user } = useAuth()
   const [countryCode, setCountryCode] = useState('+1')
   const [phoneNumber, setPhoneNumber] = useState('')
-  const [timezone, setTimezone] = useState('America/New_York') // Default to Eastern Time
+  const [timezone, setTimezone] = useState('America/New_York')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
@@ -76,16 +146,11 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
     setTimeout(() => setPhoneCopied(false), 2000)
   }
 
-  // Check if user already has a phone number
   useEffect(() => {
-    if (!user) {
-      setChecking(false)
-      return
-    }
+    if (!user) { setChecking(false); return }
 
     async function checkPhoneNumber() {
       if (!user) return
-      
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -93,7 +158,7 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
           .eq('id', user.id)
           .single()
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        if (error && error.code !== 'PGRST116') {
           console.error('Error checking phone number:', error)
           setChecking(false)
           return
@@ -103,10 +168,10 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
           setHasPhoneNumber(true)
           const existingPhone = data.phone_number
           if (existingPhone.startsWith('+')) {
-            const matchedCode = COUNTRY_CODES.find(cc => existingPhone.startsWith(cc.code))
-            if (matchedCode) {
-              setCountryCode(matchedCode.code)
-              setPhoneNumber(existingPhone.substring(matchedCode.code.length))
+            const matched = COUNTRY_CODES.find(cc => existingPhone.startsWith(cc.code))
+            if (matched) {
+              setCountryCode(matched.code)
+              setPhoneNumber(existingPhone.substring(matched.code.length))
             } else {
               setCountryCode('+1')
               setPhoneNumber(existingPhone.substring(1))
@@ -132,40 +197,21 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
     setLoading(true)
     setError(null)
 
-    const cleanedNumber = phoneNumber.trim().replace(/\s+/g, '')
-    if (!cleanedNumber) {
-      setError('Please enter a phone number')
-      setLoading(false)
-      return
-    }
-
-    if (!/^\d+$/.test(cleanedNumber)) {
-      setError('Phone number must contain only digits')
-      setLoading(false)
-      return
-    }
-
-    const formattedPhone = countryCode + cleanedNumber
+    const cleaned = phoneNumber.trim().replace(/\s+/g, '')
+    if (!cleaned) { setError('Please enter a phone number'); setLoading(false); return }
+    if (!/^\d+$/.test(cleaned)) { setError('Phone number must contain only digits'); setLoading(false); return }
 
     try {
       const { error: updateError } = await supabase
         .from('profiles')
         .upsert(
-          {
-            id: user.id,
-            phone_number: formattedPhone,
-            timezone: timezone,
-            sms_opt_in: smsOptIn,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'id',
-          }
+          { id: user.id, phone_number: countryCode + cleaned, timezone, sms_opt_in: smsOptIn, updated_at: new Date().toISOString() },
+          { onConflict: 'id' }
         )
 
       if (updateError) {
-        console.error('Error updating phone number:', updateError)
-        setError('Failed to save phone number. Please try again.')
+        console.error('Error updating:', updateError)
+        setError('Failed to save. Please try again.')
         setLoading(false)
         return
       }
@@ -183,7 +229,15 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
   if (checking) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-gray-400">Checking...</p>
+        <div className="flex items-center gap-1.5">
+          {[0, 150, 300].map((delay) => (
+            <div
+              key={delay}
+              className="w-1.5 h-1.5 rounded-full animate-bounce"
+              style={{ background: '#3f3f46', animationDelay: `${delay}ms` }}
+            />
+          ))}
+        </div>
       </div>
     )
   }
@@ -191,46 +245,60 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
   if (hasPhoneNumber && !isEditing) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="bg-gray-900 rounded-xl shadow-2xl p-8 border border-gray-800 max-w-md w-full">
-          <div className="text-center">
-            <div className="mb-4">
-              <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold mb-2 text-white">
-              Phone Number Saved!
-            </h1>
-            <p className="text-gray-400 mb-6">
-              Your phone number has been added to your profile.
-            </p>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
-              <p className="text-sm text-gray-400 mb-2">Text your tasks to:</p>
-              <button
-                onClick={copyPhone}
-                className="flex items-center justify-center gap-2 w-full hover:text-gray-300 transition-colors"
-                title="Copy phone number"
-              >
-                <span className="text-xl font-semibold text-white">(855) 940-3326</span>
-                <span className="text-sm text-gray-400">{phoneCopied ? '✓ Copied' : '⎘'}</span>
-              </button>
-              <p className="text-xs text-gray-500 mt-2">
-                Send a message like "Buy milk tomorrow" or "Meeting at 3pm Friday"
-              </p>
-            </div>
-            <button
-              onClick={() => onDone ? onDone() : window.location.reload()}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors mb-3"
-            >
-              Continue to Calendar
-            </button>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-            >
-              Edit Settings
-            </button>
+        <div
+          className="rounded-2xl p-8 w-full max-w-sm"
+          style={{ background: '#0a0a0a', border: '1px solid #1c1c1c' }}
+        >
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-6" style={{ background: '#4c1d95' }}>
+            <svg className="w-4 h-4 text-violet-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+
+          <h1 className="text-lg font-semibold text-white tracking-tight mb-1">
+            You&apos;re all set
+          </h1>
+          <p className="text-sm mb-6" style={{ color: '#52525b' }}>
+            Phone number saved to your profile.
+          </p>
+
+          <div className="rounded-xl p-4 mb-6" style={{ background: '#111111', border: '1px solid #1c1c1c' }}>
+            <p className="text-xs mb-2 uppercase tracking-wider font-medium" style={{ color: '#3f3f46' }}>
+              Text tasks to
+            </p>
+            <button
+              onClick={copyPhone}
+              className="flex items-center gap-2 w-full group transition-colors"
+              title="Copy phone number"
+            >
+              <span className="text-base font-semibold text-white">(855) 940-3326</span>
+              <span className="text-xs" style={{ color: '#52525b' }}>
+                {phoneCopied ? '✓ copied' : 'tap to copy'}
+              </span>
+            </button>
+            <p className="text-xs mt-2" style={{ color: '#3f3f46' }}>
+              e.g. &quot;Buy milk tomorrow&quot; or &quot;Meeting at 3pm Friday&quot;
+            </p>
+          </div>
+
+          <button
+            onClick={() => onDone ? onDone() : window.location.reload()}
+            className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-colors mb-2"
+            style={{ background: '#7c3aed' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#6d28d9' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#7c3aed' }}
+          >
+            Open Calendar
+          </button>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="w-full py-2.5 rounded-xl text-sm font-medium transition-colors"
+            style={{ color: '#71717a', background: 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#a1a1aa' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#71717a' }}
+          >
+            Edit Settings
+          </button>
         </div>
       </div>
     )
@@ -238,106 +306,102 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-xl shadow-2xl p-8 border border-gray-800 max-w-md w-full">
-        <h1 className="text-3xl font-bold mb-2 text-white text-center">
-          Phone Number Required
-        </h1>
-        <p className="text-gray-400 text-center mb-8">
-          To use SMS features, please add your phone number to your profile.
-        </p>
+      <div
+        className="rounded-2xl p-8 w-full max-w-sm"
+        style={{ background: '#0a0a0a', border: '1px solid #1c1c1c' }}
+      >
+        <div className="mb-7">
+          <h1 className="text-lg font-semibold text-white tracking-tight mb-1">
+            {isEditing ? 'Settings' : 'Add your phone number'}
+          </h1>
+          <p className="text-sm" style={{ color: '#52525b' }}>
+            {isEditing
+              ? 'Update your contact info and preferences.'
+              : 'Required to send tasks via SMS.'}
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-              Phone Number
-            </label>
+            <Label>Phone Number</Label>
             <div className="flex gap-2">
-              {/* Country Code Selector */}
-              <div className="relative">
-                <select
+              <div className="w-[140px] flex-shrink-0">
+                <StyledSelect
                   id="countryCode"
                   value={countryCode}
                   onChange={(e) => setCountryCode(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 pr-8 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer min-w-[140px]"
                   disabled={loading}
                   required
                 >
                   {COUNTRY_CODES.map((cc) => (
-                    <option key={cc.code} value={cc.code} className="bg-gray-800">
+                    <option key={cc.code} value={cc.code} style={{ background: '#111111' }}>
                       {cc.code} {cc.country}
                     </option>
                   ))}
-                </select>
-                {/* Custom dropdown arrow */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                </StyledSelect>
               </div>
-              
-              {/* Phone Number Input */}
-              <input
+              <StyledInput
                 type="tel"
-                id="phone"
                 value={phoneNumber}
-                onChange={(e) => {
-                  // Only allow digits and spaces
-                  const value = e.target.value.replace(/[^\d\s]/g, '')
-                  setPhoneNumber(value)
-                }}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d\s]/g, ''))}
                 placeholder="1234567890"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={loading}
                 required
               />
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Select your country code and enter your phone number
-            </p>
           </div>
 
           <div>
-            <label htmlFor="timezone" className="block text-sm font-medium text-gray-300 mb-2">
-              Timezone
-            </label>
-            <select
+            <Label>Timezone</Label>
+            <StyledSelect
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
               disabled={loading}
               required
             >
               {TIMEZONES.map((tz) => (
-                <option key={tz.value} value={tz.value} className="bg-gray-800">
+                <option key={tz.value} value={tz.value} style={{ background: '#111111' }}>
                   {tz.label}
                 </option>
               ))}
-            </select>
-            <p className="mt-2 text-xs text-gray-500">
-              Your timezone is used to calculate dates for tasks (default: Eastern Time)
+            </StyledSelect>
+            <p className="mt-1.5 text-xs" style={{ color: '#3f3f46' }}>
+              Used to interpret dates in your SMS tasks
             </p>
           </div>
 
-          <div className="flex items-start gap-3 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <input
-              type="checkbox"
-              id="smsOptIn"
-              checked={smsOptIn}
-              onChange={(e) => setSmsOptIn(e.target.checked)}
-              className="mt-0.5 w-4 h-4 accent-blue-500 flex-shrink-0 cursor-pointer"
-              disabled={loading}
-            />
-            <label htmlFor="smsOptIn" className="text-xs text-gray-400 cursor-pointer leading-relaxed">
-              <span className="text-gray-300 font-medium">Receive daily task reminders via SMS (optional)</span>
-              <br />
-              By checking this box, you agree to receive text message reminders from Task Calendar. Message and data rates may apply. Message frequency varies. You can reply STOP to opt-out at any time.
-            </label>
+          <div
+            className="flex items-start gap-3 rounded-xl p-4 cursor-pointer"
+            style={{ background: '#0f0f0f', border: '1px solid #1c1c1c' }}
+            onClick={() => !loading && setSmsOptIn(!smsOptIn)}
+          >
+            <div
+              className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-colors"
+              style={{
+                background: smsOptIn ? '#7c3aed' : 'transparent',
+                border: `1px solid ${smsOptIn ? '#7c3aed' : '#333333'}`,
+              }}
+            >
+              {smsOptIn && (
+                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white leading-none mb-1">Daily SMS reminders</p>
+              <p className="text-xs leading-relaxed" style={{ color: '#52525b' }}>
+                Receive a daily text with your upcoming tasks. Msg & data rates may apply. Reply STOP to opt out.
+              </p>
+            </div>
           </div>
 
           {error && (
-            <div className="bg-red-900/30 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+            <div
+              className="rounded-xl px-4 py-3 text-sm"
+              style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.25)', color: '#fb7185' }}
+            >
               {error}
             </div>
           )}
@@ -345,15 +409,22 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: '#7c3aed' }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#6d28d9' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#7c3aed' }}
           >
-            {loading ? 'Saving...' : isEditing ? 'Update Settings' : 'Save Phone Number'}
+            {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Save Phone Number'}
           </button>
+
           {isEditing && (
             <button
               type="button"
               onClick={() => { setIsEditing(false); onDone?.() }}
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+              className="w-full py-2.5 rounded-xl text-sm font-medium transition-colors"
+              style={{ color: '#71717a' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#a1a1aa' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#71717a' }}
             >
               Cancel
             </button>
@@ -363,4 +434,3 @@ export default function PhoneNumberSetup({ onDone }: { onDone?: () => void }) {
     </div>
   )
 }
-
