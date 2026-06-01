@@ -479,21 +479,27 @@ def send_notifications():
     if not supabase:
         return {"error": "Supabase not configured"}, 500
 
-    users = supabase.table("profiles").select(
-        "id, phone_number, timezone, "
-        "reminder_morning_time, reminder_evening_time, "
-        "reminder_morning_enabled, reminder_evening_enabled, "
-        "last_morning_reminder_date, last_evening_reminder_date"
-    ).eq("sms_opt_in", True).not_.is_("phone_number", "null").execute()
+    try:
+        users = supabase.table("profiles").select(
+            "id, phone_number, timezone, "
+            "reminder_morning_time, reminder_evening_time, "
+            "reminder_morning_enabled, reminder_evening_enabled, "
+            "last_morning_reminder_date, last_evening_reminder_date"
+        ).eq("sms_opt_in", True).execute()
+    except Exception as e:
+        print(f"Error fetching opted-in users: {e}")
+        return {"error": "Failed to fetch users"}, 500
 
     sent = 0
     skipped = 0
 
     for user in (users.data or []):
         user_id = user["id"]
-        phone = user["phone_number"]
-        tz_str = user.get("timezone") or "America/New_York"
+        phone = user.get("phone_number")
+        if not phone:
+            continue
 
+        tz_str = user.get("timezone") or "America/New_York"
         try:
             tz = ZoneInfo(tz_str)
         except Exception:
@@ -503,57 +509,80 @@ def send_notifications():
         today_str = now.strftime("%Y-%m-%d")
         current_minutes = now.hour * 60 + now.minute
 
-        def _in_window(time_str: str) -> bool:
+        def _time_has_passed(time_str: str) -> bool:
             try:
                 h, m = map(int, time_str.split(":"))
-                return abs(current_minutes - (h * 60 + m)) <= 15
+                return current_minutes >= h * 60 + m
             except Exception:
                 return False
 
         morning_time = user.get("reminder_morning_time") or "08:00"
         evening_time = user.get("reminder_evening_time") or "18:00"
-        morning_enabled = user.get("reminder_morning_enabled", True)
-        evening_enabled = user.get("reminder_evening_enabled", True)
+        morning_enabled = user.get("reminder_morning_enabled")
+        evening_enabled = user.get("reminder_evening_enabled")
+        # Default to True if the column is null (existing users before migration)
+        if morning_enabled is None:
+            morning_enabled = True
+        if evening_enabled is None:
+            evening_enabled = True
         last_morning = user.get("last_morning_reminder_date")
         last_evening = user.get("last_evening_reminder_date")
 
-        # Morning reminder
-        if morning_enabled and last_morning != today_str and _in_window(morning_time):
-            tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
-            if tasks.data:
+        print(f"[notify] user={user_id} now={now.strftime('%H:%M')} tz={tz_str} morning={morning_time}(enabled={morning_enabled},last={last_morning}) evening={evening_time}(enabled={evening_enabled},last={last_evening})")
+
+        # Morning reminder — send on first run after the reminder time, once per day
+        if morning_enabled and last_morning != today_str and _time_has_passed(morning_time):
+            try:
+                tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
+            except Exception as e:
+                print(f"Error fetching tasks for morning reminder {user_id}: {e}")
+                tasks = None
+            if tasks and tasks.data:
                 task_lines = "\n".join(f"• {t['task_name']}" for t in tasks.data)
                 n = len(tasks.data)
                 msg = f"Good morning! You have {n} task{'s' if n != 1 else ''} due today:\n{task_lines}\nReply to add or complete tasks."
                 try:
                     send_sms(phone, msg)
                     supabase.table("profiles").update({"last_morning_reminder_date": today_str}).eq("id", user_id).execute()
+                    print(f"[notify] sent morning SMS to {user_id}")
                     sent += 1
                 except Exception as e:
                     print(f"Error sending morning SMS to {user_id}: {e}")
                     skipped += 1
             else:
+                print(f"[notify] skipped morning for {user_id}: no tasks today")
                 skipped += 1
         else:
-            if not morning_enabled or last_morning == today_str or not _in_window(morning_time):
-                skipped += 1
+            print(f"[notify] skipped morning for {user_id}: enabled={morning_enabled} passed={_time_has_passed(morning_time)} already_sent={last_morning == today_str}")
+            skipped += 1
 
-        # Evening reminder
-        if evening_enabled and last_evening != today_str and _in_window(evening_time):
-            tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
-            if tasks.data:
+        # Evening reminder — send on first run after the reminder time, once per day
+        if evening_enabled and last_evening != today_str and _time_has_passed(evening_time):
+            try:
+                tasks = supabase.table("tasks").select("task_name").eq("user_id", user_id).eq("due_date", today_str).eq("completed", False).execute()
+            except Exception as e:
+                print(f"Error fetching tasks for evening reminder {user_id}: {e}")
+                tasks = None
+            if tasks and tasks.data:
                 task_lines = "\n".join(f"• {t['task_name']}" for t in tasks.data)
                 n = len(tasks.data)
                 msg = f"Evening check-in! {n} task{'s' if n != 1 else ''} still incomplete today:\n{task_lines}\nReply to mark tasks done."
                 try:
                     send_sms(phone, msg)
                     supabase.table("profiles").update({"last_evening_reminder_date": today_str}).eq("id", user_id).execute()
+                    print(f"[notify] sent evening SMS to {user_id}")
                     sent += 1
                 except Exception as e:
                     print(f"Error sending evening SMS to {user_id}: {e}")
                     skipped += 1
             else:
+                print(f"[notify] skipped evening for {user_id}: no incomplete tasks today")
                 skipped += 1
+        else:
+            print(f"[notify] skipped evening for {user_id}: enabled={evening_enabled} passed={_time_has_passed(evening_time)} already_sent={last_evening == today_str}")
+            skipped += 1
 
+    print(f"[notify] done: sent={sent} skipped={skipped}")
     return {"sent": sent, "skipped": skipped}, 200
 
 
