@@ -220,8 +220,12 @@ def save_to_supabase(task_data: TaskSchema, user_id: str):
 
 def send_sms(to_number: str, message: str):
     from twilio.rest import Client
-    client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
-    client.messages.create(to=to_number, from_=TWILIO_FROM_NUMBER, body=message)
+    sid = os.getenv("TWILLIO_SID")
+    token = os.getenv("TWILLIO_AUTH_TOKEN")
+    from_number = os.getenv("TWILIO_FROM_NUMBER")
+    print(f"[sms] sid_set={bool(sid)} token_set={bool(token)} from_set={bool(from_number)}")
+    client = Client(sid, token)
+    client.messages.create(to=to_number, from_=from_number, body=message)
 
 def sms_reply(text: str) -> Response:
     resp = MessagingResponse()
