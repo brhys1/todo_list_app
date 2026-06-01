@@ -20,5 +20,6 @@ EXPOSE 8080
 
 # Run the application
 ENV FLASK_APP=main.py
+ENV PYTHONUNBUFFERED=1
 
 CMD uv run python main.py
